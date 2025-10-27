@@ -1,62 +1,82 @@
-name: Terraform Security Check with Checkov
+# Arquivo: template_codebuild/.github/workflows/template_codebuild.yml
 
-# Dispara o workflow em todo push para a branch 'main'
+name: Checkov Reutilizável - Validação de Segurança
+
 on:
   workflow_call:
 
 permissions:
-  contents: read # Apenas leitura do repositório
+  contents: read
 
 jobs:
   checkov-scan:
-    # Nome do Job
     name: Run Checkov Security Scan
-    
-    # Diz ao GitHub Actions para usar seu projeto CodeBuild como a máquina (runner)
     runs-on: codebuild-checkov-validate-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
-      - name: Checkout do código
+      - name: Checkout do código (Do Repositório Chamador!)
         uses: actions/checkout@v4
 
-      - name: Instalar Dependências (Checkov e JQ)
+      - name: Instalar Dependências (Checkov, JQ, YQ)
         run: |
           pip install checkov
-          # O 'jq' é necessário para ler a resposta JSON do assume-role
-          # A imagem do CodeBuild é baseada em Ubuntu, então usamos apt-get
           yum install -y jq
+          # Instala o yq para ler o arquivo de skips local
+          yum install -y yq 
 
+      # --- CÓDIGO DO ASSUME ROLE COMPLETO ---
       - name: Assumir Role da conta PRD e exportar credenciais
         run: |
           echo "Assumindo a role da conta PRD..."
           # 1. Pede o "crachá de visitante" (Assume Role)
           CREDS=$(aws sts assume-role \
                     --role-arn "arn:aws:iam::977919013454:role/clouddog-checkov-prd-role" \
-                    --role-session-name "CheckovGitHubActionSession")
+                    --role-session-name "CheckovReusableWorkflowSession")
           
           # 2. Configura o AWS CLI para USAR esse crachá nos próximos passos
-          #    Usamos $GITHUB_ENV para passar as variáveis entre os 'steps'
           echo "AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r .Credentials.AccessKeyId)" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r .Credentials.SecretAccessKey)" >> $GITHUB_ENV
           echo "AWS_SESSION_TOKEN=$(echo $CREDS | jq -r .Credentials.SessionToken)" >> $GITHUB_ENV
           echo "Credenciais temporárias prontas para os próximos passos."
+      # --- FIM DO CÓDIGO DO ASSUME ROLE ---
       
-      - name: Baixar regras customizadas do S3 (de PRD)
+      - name: Baixar arquivo de configuração CENTRAL do S3 (de PRD)
         run: |
-          echo "Baixando regras da pasta /checkov/ do bucket S3 de PRD..."
-          # Cria o diretório local que o seu comando checkov espera
-          mkdir ./checkov_policies
-          
-          # Baixa o conteúdo da pasta 'checkov' do S3 para o diretório local
-          # Este comando usa automaticamente as credenciais temporárias do passo anterior
-          aws s3 cp s3://clouddog-checkov-prd-bucket/checkov/ ./checkov_policies --recursive
-          echo "Regras baixadas."
+          # Cria pasta separada para config central
+          mkdir -p ./checkov_config_central 
+          aws s3 cp s3://clouddog-checkov-prd-bucket/checkov/.checkov.yml ./checkov_config_central/.checkov.yml
+          echo "Configuração central baixada."
+
+      # --- Lógica para ler os skips locais ---
+      - name: Preparar Skips Locais (do checkov_overrides.yml)
+        id: local_skips # ID para referenciar o output
+        run: |
+          LOCAL_SKIP_FILE="checkov_overrides.yml" # Nome do arquivo local de skips
+          SKIP_LIST=""          
+          echo "Verificando se o arquivo de skip local ($LOCAL_SKIP_FILE) existe..."
+          if [ -s "$LOCAL_SKIP_FILE" ]; then 
+            echo "Arquivo $LOCAL_SKIP_FILE encontrado. Extraindo skips..."
+            SKIP_LIST=$(yq '.skip-check[] | select(length > 0)' "$LOCAL_SKIP_FILE" | paste -sd,)
+            echo "Skips locais encontrados: $SKIP_LIST"
+          else
+            echo "Nenhum arquivo de skip local ($LOCAL_SKIP_FILE) encontrado ou está vazio."
+          fi
+          echo "skip_list=$SKIP_LIST" >> $GITHUB_OUTPUT
+      # --- Fim da lógica dos skips ---
 
       - name: Rodar análise de segurança
-  run: |
-    echo "Rodando scan do Checkov na pasta ./terraform usando a CONFIGURAÇÃO do S3..."
-    echo "Verificando se o arquivo de config foi baixado:"
-    ls -la ${{ github.workspace }}/checkov_policies # Debug
+        run: |
+          echo "Rodando scan do Checkov na pasta ./terraform usando config CENTRAL e skips LOCAIS..."          
+          # Constrói a flag --skip-check apenas se a lista não estiver vazia
+          SKIP_FLAG=""
+          if [[ -n "${{ steps.local_skips.outputs.skip_list }}" ]]; then
+            SKIP_FLAG="--skip-check ${{ steps.local_skips.outputs.skip_list }}"
+            echo "Aplicando skips locais: $SKIP_FLAG"
+          else
+            echo "Nenhum skip local para aplicar."
+          fi
 
-    # Comando corrigido: Confia apenas no arquivo de configuração baixado
-    checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml --external-checks-dir ${{ github.workspace }}/checkov_overrides.yml
+          # Comando final: Usa config central + skips locais (se houver)
+          checkov -d ./terraform \
+                  --config-file ${{ github.workspace }}/checkov_config_central/.checkov.yml \
+                  $SKIP_FLAG
