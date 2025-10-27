@@ -59,4 +59,6 @@ jobs:
           ls -la ${{ github.workspace }}/checkov_policies # Debug
           
           # Comando corrigido: Confia apenas no arquivo de configuração baixado
-          checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml
+          checkov -d ./terraform \
+          --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml \
+          --external-checks-dir ${{ github.workspace }}/checkov_overrides.yml
