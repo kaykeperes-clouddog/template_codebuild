@@ -53,10 +53,10 @@ jobs:
           echo "Regras baixadas."
 
       - name: Rodar análise de segurança
-        run: |
-          echo "Rodando scan do Checkov na pasta ./terraform usando a CONFIGURAÇÃO do S3..."
-          echo "Verificando se o arquivo de config foi baixado:"
-          ls -la ${{ github.workspace }}/checkov_policies # Debug
-          
-          # Comando corrigido: Confia apenas no arquivo de configuração baixado
-         checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml --external-checks-dir ${{ github.workspace }}/checkov_overrides.yml
+  run: |
+    echo "Rodando scan do Checkov na pasta ./terraform usando a CONFIGURAÇÃO do S3..."
+    echo "Verificando se o arquivo de config foi baixado:"
+    ls -la ${{ github.workspace }}/checkov_policies # Debug
+
+    # Comando corrigido: Confia apenas no arquivo de configuração baixado
+    checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml --external-checks-dir ${{ github.workspace }}/checkov_overrides.yml
