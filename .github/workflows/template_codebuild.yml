@@ -28,20 +28,25 @@ jobs:
           # 1. Pede o "crachá de visitante" (Assume Role)
           CREDS=$(aws sts assume-role \
                     --role-arn "arn:aws:iam::977919013454:role/clouddog-checkov-prd-role" \
-                    --role-session-name "CheckovReusableWorkflowSession")
+                    --role-session-name "CheckovGitHubActionSession")
           
           # 2. Configura o AWS CLI para USAR esse crachá nos próximos passos
+          #    Usamos $GITHUB_ENV para passar as variáveis entre os 'steps'
           echo "AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r .Credentials.AccessKeyId)" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r .Credentials.SecretAccessKey)" >> $GITHUB_ENV
           echo "AWS_SESSION_TOKEN=$(echo $CREDS | jq -r .Credentials.SessionToken)" >> $GITHUB_ENV
           echo "Credenciais temporárias prontas para os próximos passos."
       
-      - name: Baixar arquivo de configuração CENTRAL do S3 (de PRD)
+      - name: Baixar regras customizadas do S3 (de PRD)
         run: |
-          # Cria pasta separada para config central
-          mkdir -p ./checkov_config_central 
-          aws s3 cp s3://clouddog-checkov-prd-bucket/checkov/.checkov.yml ./checkov_config_central/.checkov.yml
-          echo "Configuração central baixada."
+          echo "Baixando regras da pasta /checkov/ do bucket S3 de PRD..."
+          # Cria o diretório local que o seu comando checkov espera
+          mkdir ./checkov_policies
+          
+          # Baixa o conteúdo da pasta 'checkov' do S3 para o diretório local
+          # Este comando usa automaticamente as credenciais temporárias do passo anterior
+          aws s3 cp s3://clouddog-checkov-prd-bucket/checkov/ ./checkov_policies --recursive
+          echo "Regras baixadas."
 
       
 
@@ -51,4 +56,4 @@ jobs:
           ls -la ${{ github.workspace }}/checkov_config_central # Debug para confirmar download
 
           # Comando final simplificado: Usa apenas o config file do S3
-          checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.ymll
+          checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml
