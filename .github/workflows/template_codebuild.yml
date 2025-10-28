@@ -35,7 +35,7 @@ jobs:
       - name: Download Central Checkov Config from S3 (PRD)
         run: |
           CONFIG_DIR="./checkov_config_central"
-          CONFIG_FILE=".checkov.yml"
+          CONFIG_FILE="checkov.yml"
           echo "Downloading central config $CONFIG_FILE from S3 (local PRD account)..."
           mkdir -p $CONFIG_DIR
           # Comando usa a permissão direta da Role do CodeBuild (em PRD)
