@@ -50,10 +50,11 @@ jobs:
 
       
 
-      - name: Rodar análise de segurança (Usando apenas Config Central)
+      - name: Rodar análise de segurança
         run: |
-          echo "Rodando scan do Checkov na pasta ./terraform usando APENAS a config CENTRAL do S3..."
-          ls -la ${{ github.workspace }}/checkov_config_central # Debug para confirmar download
+          echo "Rodando scan do Checkov na pasta ./terraform usando config CENTRAL..."
+          ls -la ${{ github.workspace }}/checkov_policies # Debug para confirmar download
 
-          # Comando final simplificado: Usa apenas o config file do S3
-          checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml
+          # Comando corrigido: Aponta para a pasta correta 'checkov_policies'
+          checkov -d ./terraform \
+                  --config-file ${{ github.workspace }}/checkov_policies/.checkov.yml
