@@ -17,22 +17,11 @@ jobs:
       - name: Checkout do código (Do Repositório Chamador!)
         uses: actions/checkout@v4
 
-      - name: Instalar Dependências (Checkov, JQ, YQ)
+      - name: Instalar Dependências (Checkov, JQ) 
         run: |
           pip install checkov
           yum install -y jq
           
-          # Instala o yq manualmente (baixando o binário)
-          echo "Instalando yq..."
-          YQ_VERSION="v4.44.2" # Use a versão mais recente se preferir
-          YQ_BINARY="yq_linux_amd64"
-          wget https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}.tar.gz -O /tmp/yq.tar.gz
-          tar -xzf /tmp/yq.tar.gz -C /tmp
-          mv /tmp/${YQ_BINARY} /usr/bin/yq
-          chmod +x /usr/bin/yq
-          yq --version # Verifica se a instalação funcionou
-
-      # --- CÓDIGO DO ASSUME ROLE COMPLETO ---
       - name: Assumir Role da conta PRD e exportar credenciais
         run: |
           echo "Assumindo a role da conta PRD..."
@@ -46,7 +35,6 @@ jobs:
           echo "AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r .Credentials.SecretAccessKey)" >> $GITHUB_ENV
           echo "AWS_SESSION_TOKEN=$(echo $CREDS | jq -r .Credentials.SessionToken)" >> $GITHUB_ENV
           echo "Credenciais temporárias prontas para os próximos passos."
-      # --- FIM DO CÓDIGO DO ASSUME ROLE ---
       
       - name: Baixar arquivo de configuração CENTRAL do S3 (de PRD)
         run: |
@@ -55,36 +43,12 @@ jobs:
           aws s3 cp s3://clouddog-checkov-prd-bucket/checkov/.checkov.yml ./checkov_config_central/.checkov.yml
           echo "Configuração central baixada."
 
-      # --- Lógica para ler os skips locais ---
-      - name: Preparar Skips Locais (do checkov_overrides.yml)
-        id: local_skips # ID para referenciar o output
-        run: |
-          LOCAL_SKIP_FILE="checkov_overrides.yml" # Nome do arquivo local de skips
-          SKIP_LIST=""          
-          echo "Verificando se o arquivo de skip local ($LOCAL_SKIP_FILE) existe..."
-          if [ -s "$LOCAL_SKIP_FILE" ]; then 
-            echo "Arquivo $LOCAL_SKIP_FILE encontrado. Extraindo skips..."
-            SKIP_LIST=$(yq '.skip-check[] | select(length > 0)' "$LOCAL_SKIP_FILE" | paste -sd,)
-            echo "Skips locais encontrados: $SKIP_LIST"
-          else
-            echo "Nenhum arquivo de skip local ($LOCAL_SKIP_FILE) encontrado ou está vazio."
-          fi
-          echo "skip_list=$SKIP_LIST" >> $GITHUB_OUTPUT
-      # --- Fim da lógica dos skips ---
+      
 
-      - name: Rodar análise de segurança
+      - name: Rodar análise de segurança (Usando apenas Config Central)
         run: |
-          echo "Rodando scan do Checkov na pasta ./terraform usando config CENTRAL e skips LOCAIS..."          
-          # Constrói a flag --skip-check apenas se a lista não estiver vazia
-          SKIP_FLAG=""
-          if [[ -n "${{ steps.local_skips.outputs.skip_list }}" ]]; then
-            SKIP_FLAG="--skip-check ${{ steps.local_skips.outputs.skip_list }}"
-            echo "Aplicando skips locais: $SKIP_FLAG"
-          else
-            echo "Nenhum skip local para aplicar."
-          fi
+          echo "Rodando scan do Checkov na pasta ./terraform usando APENAS a config CENTRAL do S3..."
+          ls -la ${{ github.workspace }}/checkov_config_central # Debug para confirmar download
 
-          # Comando final: Usa config central + skips locais (se houver)
-          checkov -d ./terraform \
-                  --config-file ${{ github.workspace }}/checkov_config_central/.checkov.yml \
-                  $SKIP_FLAG
+          # Comando final simplificado: Usa apenas o config file do S3
+          checkov -d ./terraform --config-file ${{ github.workspace }}/checkov_policies/.checkov.ymll
