@@ -32,16 +32,21 @@ jobs:
           
       # --- PASSO Assume Role REMOVIDO ---
       
-      - name: Download Central Checkov Config from S3 (PRD)
+     - name: Download Central Checkov Config from S3 (PRD)
         run: |
           CONFIG_DIR="./checkov_config_central"
-          CONFIG_FILE="checkov.yml"
-          echo "Downloading central config $CONFIG_FILE from S3 (local PRD account)..."
+          CONFIG_FILE=".checkov.yml" # CONFIRMADO PELA IMAGEM
+          BUCKET_NAME="clouddog-checkov-prd-bucket" # CONFIRMADO PELA IMAGEM
+          S3_PATH="checkov" # CONFIRMADO PELA IMAGEM
+
+          echo "Downloading central config $CONFIG_FILE from S3 bucket $BUCKET_NAME/$S3_PATH/ ..."
           mkdir -p $CONFIG_DIR
-          # Comando usa a permissão direta da Role do CodeBuild (em PRD)
-          aws s3 cp "s3://clog-checkov-prd-bucket/checkov/$CONFIG_FILE" "$CONFIG_DIR/$CONFIG_FILE"
+          # Comando para baixar o arquivo .checkov.yml
+          aws s3 cp "s3://$BUCKET_NAME/$S3_PATH/$CONFIG_FILE" "$CONFIG_DIR/$CONFIG_FILE"
+          
           echo "Central config downloaded."
-          ls -la $CONFIG_DIR
+          echo "Verifying download:"
+          ls -la $CONFIG_DIR # Verifica se o arquivo foi baixado
 
       # --- Lógica Opcional para Skips Locais (se mantida) ---
       # - name: Preparar Skips Locais 
@@ -51,7 +56,7 @@ jobs:
 
       - name: Run Checkov Security Scan
         run: |
-          CONFIG_FILE_PATH="${{ github.workspace }}/checkov_config_central/.checkov.yml"
+          CONFIG_FILE_PATH="${{ github.workspace }}/checkov_config_central/.checkov.yml" # Caminho correto
           TERRAFORM_DIR="${{ inputs.terraform_directory }}"
           
           echo "Running Checkov scan on '$TERRAFORM_DIR' using central config '$CONFIG_FILE_PATH'..."
@@ -62,5 +67,5 @@ jobs:
           #   SKIP_FLAG="--skip-check ${{ steps.local_skips.outputs.skip_list }}"
           # fi
 
-          # Comando final: Usa apenas config file central. $SKIP_FLAG opcional.
-          checkov -d "$TERRAFORM_DIR" --config-file "$CONFIG_FILE_PATH" # $SKIP_FLAG
+          # Comando final: Usa apenas o config file central do S3
+          checkov -d "$TERRAFORM_DIR" --config-file "$CONFIG_FILE_PATH"
