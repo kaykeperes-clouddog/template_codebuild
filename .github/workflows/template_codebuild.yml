@@ -34,22 +34,22 @@ jobs:
       - name: Download Central Checkov Config from S3 (PRD)
         run: |
           CONFIG_DIR="./checkov_config_central"
-          # Nome correto do arquivo baseado na screenshot S3
+          # Nome do arquivo no S3 (sem ponto, conforme seu comando)
           CONFIG_FILE="checkov.yml" 
-          BUCKET_NAME="clouddog-checkov-dev-bucket" # Nome correto do bucket
+          BUCKET_NAME="clouddog-checkov-dev-bucket" # Bucket atualizado
           S3_PATH="checkov"
 
           echo "Downloading central config $CONFIG_FILE from S3 bucket $BUCKET_NAME/$S3_PATH/ ..."
           mkdir -p $CONFIG_DIR
-          # Baixa o nome de arquivo correto
+          # Baixa o nome de arquivo correto (sem ponto)
           aws s3 cp "s3://$BUCKET_NAME/$S3_PATH/$CONFIG_FILE" "$CONFIG_DIR/$CONFIG_FILE"
           echo "Central config downloaded."
           ls -la $CONFIG_DIR
 
       - name: Run Checkov Security Scan
         run: |
-          # Usa a variável com o nome de arquivo correto
-          CONFIG_FILE_PATH="${{ github.workspace }}/checkov_config_central/.checkov.yml" 
+          # Usa a variável com o nome de arquivo correto (sem ponto)
+          CONFIG_FILE_PATH="${{ github.workspace }}/checkov_config_central/checkov.yml" 
           TERRAFORM_DIR="${{ inputs.terraform_directory }}"
           
           echo "Running Checkov scan on '$TERRAFORM_DIR' using central config '$CONFIG_FILE_PATH'..."
@@ -58,11 +58,11 @@ jobs:
             echo "Error: Terraform directory '$TERRAFORM_DIR' not found!"
             exit 1
           fi
-          # Verificação usa a variável com o nome de arquivo correto
+          # Verificação usa a variável com o nome de arquivo correto (sem ponto)
           if [ ! -f "$CONFIG_FILE_PATH" ]; then 
              echo "Error: Central config file '$CONFIG_FILE_PATH' not found!"
              exit 1
           fi
 
-          # Comando usa a variável com o nome de arquivo correto
+          # Comando usa a variável com o nome de arquivo correto (sem ponto)
           checkov -d "$TERRAFORM_DIR" --config-file "$CONFIG_FILE_PATH"
