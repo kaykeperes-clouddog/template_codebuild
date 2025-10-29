@@ -35,8 +35,8 @@ jobs:
         run: |
           CONFIG_DIR="./checkov_config_central"
           # Nome correto do arquivo baseado na screenshot S3
-          CONFIG_FILE=".checkov.yml" 
-          BUCKET_NAME="clouddog-checkov-prd-bucket" # Nome correto do bucket
+          CONFIG_FILE="checkov.yml" 
+          BUCKET_NAME="clouddog-checkov-dev-bucket" # Nome correto do bucket
           S3_PATH="checkov"
 
           echo "Downloading central config $CONFIG_FILE from S3 bucket $BUCKET_NAME/$S3_PATH/ ..."
