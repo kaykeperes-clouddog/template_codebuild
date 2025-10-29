@@ -1,4 +1,5 @@
-# Workflow CENTRAL REUTILIZÁVEL (quando o runner está em PRD)
+# Arquivo: .github/workflows/reusable-checkov-scan-prd-runner.yml
+# Workflow CENTRAL REUTILIZÁVEL (quando o runner está em PRD) - Indentação Corrigida
 
 name: Reusable Checkov Scan (AWS CodeBuild in PRD)
 
@@ -18,54 +19,50 @@ jobs:
   checkov-scan:
     name: Run Checkov Security Scan
     # Usa o CodeBuild Runner (que está em PRD)
-    runs-on: codebuild-Template-Checkov-${{ github.run_id }}-${{ github.run_attempt }} # Exemplo de nome ajustado
+    runs-on: codebuild-Template-Checkov-${{ github.run_id }}-${{ github.run_attempt }} # Nome correto do runner
 
     steps:
       - name: Checkout Calling Repository Code
         uses: actions/checkout@v4
 
-      - name: Install Dependencies (Checkov) # JQ não é mais necessário para o S3
+      - name: Install Dependencies (Checkov)
         run: |
           pip install checkov
-          # Opcional: Instalar YQ se for usar a estratégia de skips locais
-          # yum install -y yq 
           
       # --- PASSO Assume Role REMOVIDO ---
       
-     - name: Download Central Checkov Config from S3 (PRD)
+      - name: Download Central Checkov Config from S3 (PRD)
         run: |
           CONFIG_DIR="./checkov_config_central"
-          CONFIG_FILE=".checkov.yml" # CONFIRMADO PELA IMAGEM
-          BUCKET_NAME="clouddog-checkov-prd-bucket" # CONFIRMADO PELA IMAGEM
-          S3_PATH="checkov" # CONFIRMADO PELA IMAGEM
+          # Nome correto do arquivo baseado na screenshot S3
+          CONFIG_FILE=".checkov.yml" 
+          BUCKET_NAME="clouddog-checkov-prd-bucket" # Nome correto do bucket
+          S3_PATH="checkov"
 
           echo "Downloading central config $CONFIG_FILE from S3 bucket $BUCKET_NAME/$S3_PATH/ ..."
           mkdir -p $CONFIG_DIR
-          # Comando para baixar o arquivo .checkov.yml
+          # Baixa o nome de arquivo correto
           aws s3 cp "s3://$BUCKET_NAME/$S3_PATH/$CONFIG_FILE" "$CONFIG_DIR/$CONFIG_FILE"
-          
           echo "Central config downloaded."
-          echo "Verifying download:"
-          ls -la $CONFIG_DIR # Verifica se o arquivo foi baixado
-
-      # --- Lógica Opcional para Skips Locais (se mantida) ---
-      # - name: Preparar Skips Locais 
-      #   id: local_skips
-      #   run: |
-      #     # ... (código com yq como antes) ...
+          ls -la $CONFIG_DIR
 
       - name: Run Checkov Security Scan
         run: |
-          CONFIG_FILE_PATH="${{ github.workspace }}/checkov_config_central/.checkov.yml" # Caminho correto
+          # Usa a variável com o nome de arquivo correto
+          CONFIG_FILE_PATH="${{ github.workspace }}/checkov_config_central/.checkov.yml" 
           TERRAFORM_DIR="${{ inputs.terraform_directory }}"
           
           echo "Running Checkov scan on '$TERRAFORM_DIR' using central config '$CONFIG_FILE_PATH'..."
-          # ... (verificações de existência de pasta/arquivo como antes) ...
+          
+          if [ ! -d "$TERRAFORM_DIR" ]; then
+            echo "Error: Terraform directory '$TERRAFORM_DIR' not found!"
+            exit 1
+          fi
+          # Verificação usa a variável com o nome de arquivo correto
+          if [ ! -f "$CONFIG_FILE_PATH" ]; then 
+             echo "Error: Central config file '$CONFIG_FILE_PATH' not found!"
+             exit 1
+          fi
 
-          # SKIP_FLAG="" # Remover/Comentar se não usar skips locais
-          # if [[ -n "${{ steps.local_skips.outputs.skip_list }}" ]]; then
-          #   SKIP_FLAG="--skip-check ${{ steps.local_skips.outputs.skip_list }}"
-          # fi
-
-          # Comando final: Usa apenas o config file central do S3
+          # Comando usa a variável com o nome de arquivo correto
           checkov -d "$TERRAFORM_DIR" --config-file "$CONFIG_FILE_PATH"
